@@ -1,4 +1,5 @@
 // In-memory file abstraction.
+
 package memfile
 
 import (

@@ -8,5 +8,18 @@ In-memory `os.File` abstraction for Go.
 go get github.com/cuhsat/memfile
 ```
 
+## Example
+```go
+f := New("example")
+
+f.WriteString("Hello World")
+
+f.Seek(0, io.SeekStart)
+
+b, _ := io.ReadAll(f)
+
+fmt.Println(string(b))
+```
+
 ## License
 Released under the [MIT License](LICENSE.md).
