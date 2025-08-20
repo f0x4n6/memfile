@@ -1,5 +1,4 @@
 // Memfile is an in-memory, thread-safe, dependency-free file abstraction.
-
 package memfile
 
 import (
