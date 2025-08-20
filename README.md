@@ -2,7 +2,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cuhsat/memfile.svg)](https://pkg.go.dev/github.com/cuhsat/memfile)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cuhsat/memfile?style=flat-square)](https://goreportcard.com/report/github.com/cuhsat/memfile)
 
-In-memory `os.File` abstraction for Go.
+Memfile is an in-memory thread-safe file abstraction for Go. It seeks to be compatible with most of the `io` interfaces that `os.File` supports, so I can be used as an drop-in replacement.
 
 ```console
 go get github.com/cuhsat/memfile
@@ -10,15 +10,15 @@ go get github.com/cuhsat/memfile
 
 ## Example
 ```go
-f := New("example")
+mf := memfile.New("example")
 
-f.WriteString("Hello World")
+mf.WriteString("Hello World")
 
-f.Seek(0, io.SeekStart)
+mf.Seek(0, io.SeekStart)
 
-b, _ := io.ReadAll(f)
+buf, _ := io.ReadAll(mf)
 
-fmt.Println(string(b))
+fmt.Println(string(buf))
 ```
 
 ## License

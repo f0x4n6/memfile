@@ -1,4 +1,4 @@
-// In-memory file abstraction.
+// Memfile is an in-memory thread-safe file abstraction.
 
 package memfile
 
@@ -16,7 +16,7 @@ var (
 	ErrorInvalidOffset = errors.New("invalid offset")
 )
 
-// File is an os.file compatible interface
+// File supports a wide range of io interfaces.
 type File interface {
 	io.Closer
 	io.Reader
