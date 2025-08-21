@@ -6,7 +6,7 @@ Memfile is an in-memory, thread-safe, dependency-free file abstraction. It seeks
 
 ## Example
 ```go
-file := memfile.New("example")
+file := memfile.Create("example")
 file.WriteString("Hello World")
 
 file.Seek(0, io.SeekStart)

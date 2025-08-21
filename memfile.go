@@ -68,7 +68,7 @@ type FileInfo struct {
 }
 
 // New returns a new os.File like structure.
-func New(name string) Fileable {
+func Create(name string) *File {
 	return &File{name: name, open: true}
 }
 

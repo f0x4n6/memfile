@@ -6,7 +6,7 @@ import (
 )
 
 func Example() {
-	f := New("example")
+	f := Create("example")
 
 	_, err := f.WriteString("Hello World")
 
