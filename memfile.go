@@ -89,6 +89,7 @@ func (f *File) Open() error {
 	f.Lock()
 	defer f.Unlock()
 	f.open = true
+	f.off.Store(0)
 	return nil
 }
 
