@@ -11,10 +11,10 @@ import (
 )
 
 var (
-	// ErrorFileClosed indicates an already closed file
-	ErrorFileClosed = errors.New("file closed")
-	// ErrorInvalidOffset indicates an invalid offset
-	ErrorInvalidOffset = errors.New("invalid offset")
+	// ErrClosed indicates an already closed file
+	ErrClosed = errors.New("file already closed")
+	// ErrOffset indicates an invalid offset
+	ErrOffset = errors.New("invalid offset")
 )
 
 // Fileable supports a wide range of io interfaces.
@@ -84,6 +84,14 @@ func (f *File) MMap() []byte {
 	return f.buf
 }
 
+// Open the file for read and write.
+func (f *File) Open() error {
+	f.Lock()
+	defer f.Unlock()
+	f.open = true
+	return nil
+}
+
 // Close the file for read and write.
 func (f *File) Close() error {
 	f.Lock()
@@ -105,11 +113,11 @@ func (f *File) ReadAt(b []byte, off int64) (n int, err error) {
 	defer f.RUnlock()
 
 	if !f.open {
-		return 0, ErrorFileClosed
+		return 0, ErrClosed
 	}
 
 	if off < 0 || int64(int(off)) < off {
-		return 0, ErrorInvalidOffset
+		return 0, ErrOffset
 	}
 
 	if off > int64(len(f.buf)) {
@@ -144,7 +152,7 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	defer f.RUnlock()
 
 	if !f.open {
-		return 0, ErrorFileClosed
+		return 0, ErrClosed
 	}
 
 	var abs int64
@@ -157,11 +165,11 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		abs = int64(len(f.buf)) + offset
 	default:
-		return 0, ErrorInvalidOffset
+		return 0, ErrOffset
 	}
 
 	if abs < 0 {
-		return 0, ErrorInvalidOffset
+		return 0, ErrOffset
 	}
 
 	f.off.Store(abs)
@@ -180,12 +188,12 @@ func (f *File) Truncate(size int64) error {
 	defer f.Unlock()
 
 	if !f.open {
-		return ErrorFileClosed
+		return ErrClosed
 	}
 
 	switch {
 	case size < 0 || int64(int(size)) < size:
-		return ErrorInvalidOffset
+		return ErrOffset
 	case size <= int64(len(f.buf)):
 		f.buf = f.buf[:size]
 	default:
@@ -214,11 +222,11 @@ func (f *File) WriteAt(b []byte, off int64) (n int, err error) {
 	defer f.Unlock()
 
 	if !f.open {
-		return 0, ErrorFileClosed
+		return 0, ErrClosed
 	}
 
 	if off < 0 || int64(int(off)) < off {
-		return 0, ErrorInvalidOffset
+		return 0, ErrOffset
 	}
 
 	if off > int64(len(f.buf)) {
