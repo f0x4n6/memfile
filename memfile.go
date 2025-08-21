@@ -77,6 +77,13 @@ func (f *File) Name() string {
 	return f.name
 }
 
+// MMap returns the file buffer directly.
+func (f *File) MMap() []byte {
+	f.RLock()
+	defer f.RUnlock()
+	return f.buf
+}
+
 // Close the file for read and write.
 func (f *File) Close() error {
 	f.Lock()
