@@ -188,7 +188,7 @@ func (f *File) Truncate(size int64) error {
 	f.mod = time.Now()
 
 	if f.fn != nil {
-		f.fn(f.name)
+		go f.fn(f.name)
 	}
 
 	return nil
@@ -224,7 +224,7 @@ func (f *File) WriteAt(b []byte, off int64) (n int, err error) {
 	f.mod = time.Now()
 
 	if f.fn != nil {
-		f.fn(f.name)
+		go f.fn(f.name)
 	}
 
 	return len(b), nil
