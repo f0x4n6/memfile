@@ -1,4 +1,4 @@
-// Memfile is an in-memory, thread-safe, dependency-free file abstraction.
+// Package memfile is an in-memory, thread-safe, dependency-free file abstraction.
 package memfile
 
 import (
@@ -11,12 +11,14 @@ import (
 )
 
 var (
+	// ErrorFileClosed indicates an already closed file
+	ErrorFileClosed = errors.New("file closed")
 	// ErrorInvalidOffset indicates an invalid offset
 	ErrorInvalidOffset = errors.New("invalid offset")
 )
 
-// File supports a wide range of io interfaces.
-type File interface {
+// Fileable supports a wide range of io interfaces.
+type Fileable interface {
 	io.Closer
 	io.Reader
 	io.ReaderAt
@@ -40,77 +42,74 @@ type File interface {
 	Truncate(size int64) error
 }
 
-// FileData provides an in-memory file data structure.
-type FileData struct {
+// Notify callback for file changes
+type Notify func(name string)
+
+// File provides an in-memory file structure.
+type File struct {
 	sync.RWMutex
 	// Given filename.
 	name string
+	// If file is open.
+	open bool
 	// File buffer.
 	buf []byte
 	// File offset.
 	off atomic.Int64
 	// File last modified time.
 	mod time.Time
-	// File notification channel.
-	ch chan string
+	// File notification callback.
+	fn Notify
 }
 
 // FileInfo provides a fs.FileInfo compatible structure.
 type FileInfo struct {
-	fd *FileData // file data
+	f *File // file data
 }
 
-// New returns a new file like structure.
-func New(name string) File {
-	return &FileData{name: name}
+// New returns a new os.File like structure.
+func New(name string) Fileable {
+	return &File{name: name, open: true}
 }
 
 // Name returns the file name.
-func (fd *FileData) Name() string {
-	return fd.name
+func (f *File) Name() string {
+	return f.name
 }
 
-// Bytes returns the file data.
-func (fd *FileData) Bytes() []byte {
-	fd.RLock()
-	defer fd.RUnlock()
-	return fd.buf
-}
-
-// Notify sets the file notification channel.
-func (fd *FileData) Notify(ch chan string) {
-	fd.Lock()
-	fd.ch = ch
-	fd.Unlock()
-}
-
-// Close resets the file offset.
-func (fd *FileData) Close() error {
-	fd.off.Store(0)
+// Close the file for read and write.
+func (f *File) Close() error {
+	f.Lock()
+	defer f.Unlock()
+	f.open = false
 	return nil
 }
 
 // Read the current file offset.
-func (fd *FileData) Read(b []byte) (n int, err error) {
-	n, err = fd.ReadAt(b, fd.off.Load())
-	fd.off.Add(int64(n))
+func (f *File) Read(b []byte) (n int, err error) {
+	n, err = f.ReadAt(b, f.off.Load())
+	f.off.Add(int64(n))
 	return
 }
 
 // ReadAt the given file offset.
-func (fd *FileData) ReadAt(b []byte, off int64) (n int, err error) {
-	fd.RLock()
-	defer fd.RUnlock()
+func (f *File) ReadAt(b []byte, off int64) (n int, err error) {
+	f.RLock()
+	defer f.RUnlock()
+
+	if !f.open {
+		return 0, ErrorFileClosed
+	}
 
 	if off < 0 || int64(int(off)) < off {
 		return 0, ErrorInvalidOffset
 	}
 
-	if off > int64(len(fd.buf)) {
+	if off > int64(len(f.buf)) {
 		return 0, io.EOF
 	}
 
-	n = copy(b, fd.buf[off:])
+	n = copy(b, f.buf[off:])
 
 	if n < len(b) {
 		return n, io.EOF
@@ -120,22 +119,26 @@ func (fd *FileData) ReadAt(b []byte, off int64) (n int, err error) {
 }
 
 // ReadFrom the given io.Reader.
-func (fd *FileData) ReadFrom(r io.Reader) (n int64, err error) {
+func (f *File) ReadFrom(r io.Reader) (n int64, err error) {
 	b, err := io.ReadAll(r)
 
 	if err != nil {
 		return 0, err
 	}
 
-	i, err := fd.Write(b)
+	i, err := f.Write(b)
 
 	return int64(i), err
 }
 
 // Seek sets the current file offset.
-func (fd *FileData) Seek(offset int64, whence int) (int64, error) {
-	fd.RLock()
-	defer fd.RUnlock()
+func (f *File) Seek(offset int64, whence int) (int64, error) {
+	f.RLock()
+	defer f.RUnlock()
+
+	if !f.open {
+		return 0, ErrorFileClosed
+	}
 
 	var abs int64
 
@@ -143,9 +146,9 @@ func (fd *FileData) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekStart:
 		abs = offset
 	case io.SeekCurrent:
-		abs = fd.off.Load() + offset
+		abs = f.off.Load() + offset
 	case io.SeekEnd:
-		abs = int64(len(fd.buf)) + offset
+		abs = int64(len(f.buf)) + offset
 	default:
 		return 0, ErrorInvalidOffset
 	}
@@ -154,94 +157,109 @@ func (fd *FileData) Seek(offset int64, whence int) (int64, error) {
 		return 0, ErrorInvalidOffset
 	}
 
-	fd.off.Store(abs)
+	f.off.Store(abs)
 
 	return abs, nil
 }
 
 // Stat returns fs.FileInfo like stats.
-func (fd *FileData) Stat() (fs.FileInfo, error) {
-	return &FileInfo{fd}, nil
+func (f *File) Stat() (fs.FileInfo, error) {
+	return &FileInfo{f}, nil
 }
 
 // Truncate the file to the given size.
-func (fd *FileData) Truncate(size int64) error {
-	fd.Lock()
-	defer fd.Unlock()
+func (f *File) Truncate(size int64) error {
+	f.Lock()
+	defer f.Unlock()
+
+	if !f.open {
+		return ErrorFileClosed
+	}
 
 	switch {
 	case size < 0 || int64(int(size)) < size:
 		return ErrorInvalidOffset
-	case size <= int64(len(fd.buf)):
-		fd.buf = fd.buf[:size]
+	case size <= int64(len(f.buf)):
+		f.buf = f.buf[:size]
 	default:
-		fd.buf = append(fd.buf, make([]byte, int(size)-len(fd.buf))...)
+		f.buf = append(f.buf, make([]byte, int(size)-len(f.buf))...)
 	}
 
-	fd.mod = time.Now()
+	f.mod = time.Now()
 
-	if fd.ch != nil {
-		fd.ch <- fd.name
+	if f.fn != nil {
+		f.fn(f.name)
 	}
 
 	return nil
 }
 
 // Write the given bytes at the current file offset.
-func (fd *FileData) Write(b []byte) (n int, err error) {
-	n, err = fd.WriteAt(b, fd.off.Load())
-	fd.off.Add(int64(n))
+func (f *File) Write(b []byte) (n int, err error) {
+	n, err = f.WriteAt(b, f.off.Load())
+	f.off.Add(int64(n))
 	return
 }
 
 // WriteAt the given bytes and the given file offset.
-func (fd *FileData) WriteAt(b []byte, off int64) (n int, err error) {
-	fd.Lock()
-	defer fd.Unlock()
+func (f *File) WriteAt(b []byte, off int64) (n int, err error) {
+	f.Lock()
+	defer f.Unlock()
+
+	if !f.open {
+		return 0, ErrorFileClosed
+	}
 
 	if off < 0 || int64(int(off)) < off {
 		return 0, ErrorInvalidOffset
 	}
 
-	if off > int64(len(fd.buf)) {
-		_ = fd.Truncate(off)
+	if off > int64(len(f.buf)) {
+		_ = f.Truncate(off)
 	}
 
-	n = copy(fd.buf[off:], b)
+	n = copy(f.buf[off:], b)
 
-	fd.buf = append(fd.buf, b[n:]...)
-	fd.mod = time.Now()
+	f.buf = append(f.buf, b[n:]...)
+	f.mod = time.Now()
 
-	if fd.ch != nil {
-		fd.ch <- fd.name
+	if f.fn != nil {
+		f.fn(f.name)
 	}
 
 	return len(b), nil
 }
 
 // WriteTo the given io.Writer.
-func (fd *FileData) WriteTo(w io.Writer) (n int64, err error) {
-	fd.RLock()
-	defer fd.RUnlock()
-	i, err := w.Write(fd.buf)
+func (f *File) WriteTo(w io.Writer) (n int64, err error) {
+	f.RLock()
+	defer f.RUnlock()
+	i, err := w.Write(f.buf)
 	return int64(i), err
 }
 
 // WriteString at the current file offset.
-func (fd *FileData) WriteString(s string) (n int, err error) {
-	return fd.Write([]byte(s))
+func (f *File) WriteString(s string) (n int, err error) {
+	return f.Write([]byte(s))
+}
+
+// SetNotify sets the file notification callback.
+func (f *File) SetNotify(fn Notify) {
+	f.Lock()
+	f.fn = fn
+	f.Unlock()
 }
 
 // Name returns the file name.
 func (fi *FileInfo) Name() string {
-	return fi.fd.Name()
+	return fi.f.Name()
 }
 
 // Size returns the file size in bytes.
 func (fi *FileInfo) Size() int64 {
-	fi.fd.RLock()
-	defer fi.fd.RUnlock()
-	return int64(len(fi.fd.buf))
+	fi.f.RLock()
+	defer fi.f.RUnlock()
+	return int64(len(fi.f.buf))
 }
 
 // Mode always returns 0 (regular).
@@ -251,9 +269,9 @@ func (fi *FileInfo) Mode() fs.FileMode {
 
 // ModTime returns the files last modified time.
 func (fi *FileInfo) ModTime() time.Time {
-	fi.fd.RLock()
-	defer fi.fd.RUnlock()
-	return fi.fd.mod
+	fi.f.RLock()
+	defer fi.f.RUnlock()
+	return fi.f.mod
 }
 
 // IsDir always returns false.
