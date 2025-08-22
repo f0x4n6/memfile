@@ -11,8 +11,6 @@ import (
 )
 
 var (
-	// ErrClosed indicates an already closed file
-	ErrClosed = errors.New("file already closed")
 	// ErrOffset indicates an invalid offset
 	ErrOffset = errors.New("invalid offset")
 )
@@ -50,8 +48,6 @@ type File struct {
 	sync.RWMutex
 	// Given filename.
 	name string
-	// If file is open.
-	open bool
 	// File buffer.
 	buf []byte
 	// File offset.
@@ -67,9 +63,9 @@ type FileInfo struct {
 	f *File // file data
 }
 
-// New returns a new os.File like structure.
-func Create(name string) *File {
-	return &File{name: name, open: true}
+// New returns a new File.
+func New(name string) *File {
+	return &File{name: name}
 }
 
 // Name returns the file name.
@@ -84,20 +80,8 @@ func (f *File) MMap() []byte {
 	return f.buf
 }
 
-// Open the file for read and write.
-func (f *File) Open() error {
-	f.Lock()
-	defer f.Unlock()
-	f.open = true
-	f.off.Store(0)
-	return nil
-}
-
-// Close the file for read and write.
+// Close does nothing.
 func (f *File) Close() error {
-	f.Lock()
-	defer f.Unlock()
-	f.open = false
 	return nil
 }
 
@@ -112,10 +96,6 @@ func (f *File) Read(b []byte) (n int, err error) {
 func (f *File) ReadAt(b []byte, off int64) (n int, err error) {
 	f.RLock()
 	defer f.RUnlock()
-
-	if !f.open {
-		return 0, ErrClosed
-	}
 
 	if off < 0 || int64(int(off)) < off {
 		return 0, ErrOffset
@@ -152,10 +132,6 @@ func (f *File) Seek(offset int64, whence int) (int64, error) {
 	f.RLock()
 	defer f.RUnlock()
 
-	if !f.open {
-		return 0, ErrClosed
-	}
-
 	var abs int64
 
 	switch whence {
@@ -188,10 +164,6 @@ func (f *File) Truncate(size int64) error {
 	f.Lock()
 	defer f.Unlock()
 
-	if !f.open {
-		return ErrClosed
-	}
-
 	switch {
 	case size < 0 || int64(int(size)) < size:
 		return ErrOffset
@@ -221,10 +193,6 @@ func (f *File) Write(b []byte) (n int, err error) {
 func (f *File) WriteAt(b []byte, off int64) (n int, err error) {
 	f.Lock()
 	defer f.Unlock()
-
-	if !f.open {
-		return 0, ErrClosed
-	}
 
 	if off < 0 || int64(int(off)) < off {
 		return 0, ErrOffset

@@ -2,11 +2,11 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/cuhsat/memfile.svg)](https://pkg.go.dev/github.com/cuhsat/memfile)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cuhsat/memfile?style=flat-square)](https://goreportcard.com/report/github.com/cuhsat/memfile)
 
-Memfile is an in-memory, thread-safe, dependency-free file abstraction. It seeks to be compatible with most of the `io` interfaces that `os.File` supports, so I can be used in many places.
+Memfile is an in-memory, thread-safe, dependency-free file abstraction. It seeks to be compatible with most of the `io` interfaces that `os.File` supports.
 
 ## Example
 ```go
-file := memfile.Create("example")
+file := memfile.New("example")
 file.WriteString("Hello World")
 
 file.Seek(0, io.SeekStart)
