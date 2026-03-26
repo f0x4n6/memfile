@@ -1,6 +1,6 @@
 # memfile
-[![Go Reference](https://pkg.go.dev/badge/github.com/cuhsat/memfile.svg)](https://pkg.go.dev/github.com/cuhsat/memfile)
-[![Go Report Card](https://goreportcard.com/badge/github.com/cuhsat/memfile?style=flat-square)](https://goreportcard.com/report/github.com/cuhsat/memfile)
+[![Go Reference](https://pkg.go.dev/badge/github.com/f0x4n6/memfile.svg)](https://pkg.go.dev/github.com/f0x4n6/memfile)
+[![Go Report Card](https://goreportcard.com/badge/github.com/f0x4n6/memfile?style=flat-square)](https://goreportcard.com/report/github.com/f0x4n6/memfile)
 
 Memfile is an in-memory, thread-safe, dependency-free file abstraction, that supports seek and notify. It tries to be compatible with most of the `io` interfaces that `os.File` supports. Memfile is meant for open-once usage.
 
