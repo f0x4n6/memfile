@@ -1,3 +1,3 @@
-module github.com/f0x4n6/memfile
+module go.foxforensics.dev/memfile
 
 go 1.26
